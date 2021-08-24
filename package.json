@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "promises-aplus-tests adapter"
+    "test": "promises-aplus-tests adapter --watch"
   },
   "keywords": [],
   "author": "",

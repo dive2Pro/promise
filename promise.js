@@ -1,10 +1,17 @@
+const nextTick = process.nextTick || setImmediate || setTimeout;
+
+let id = 0;
 module.exports = class MyPromise {
     constructor(cb) {
+        this.__ispromise = true;
         this.state = "pending"; // fulfilled, rejected
         this.value = null;
         this.error = null;
         this.cb = cb;
         this.thens = [];
+        this.children = [];
+        this.id = id++;
+
         if (typeof cb !== "function") {
             return;
             // throw new Error(`arguments cb `);
@@ -16,11 +23,18 @@ module.exports = class MyPromise {
         }
     }
 
+    thenWithPromise(promise) {
+        this.thens.push([promise])
+    }
+
     // then 的回调总是 nextTick 中执行
     then(promiseResolveFn, projectRejectFn) {
         const self = this;
-        const otherPromise = new MyPromise((resolve, reject) => {});
+        const otherPromise = new MyPromise((resolve, reject) => {
+        });
+        otherPromise.parent = this;
         this.thens.push([otherPromise, promiseResolveFn, projectRejectFn]);
+        this.children.push(otherPromise);
 
         if (!self.isPending()) {
             this.next();
@@ -47,6 +61,11 @@ module.exports = class MyPromise {
         return this.state === "pending";
     }
 
+    isRejected() {
+
+        return this.state === "rejected";
+    }
+
     fulfill = (val) => {
         if (!this.isPending()) {
             return;
@@ -55,6 +74,7 @@ module.exports = class MyPromise {
         this.state = "fulfilled";
         this.value = val;
         this.next();
+        return this;
     };
 
     reject = (err) => {
@@ -64,6 +84,7 @@ module.exports = class MyPromise {
         this.state = "rejected";
         this.error = err;
         this.next();
+        return this;
     };
 
     next() {
@@ -76,11 +97,12 @@ module.exports = class MyPromise {
         this.thens = [];
         const self = this;
 
-        setTimeout(function callback() {
-            thens.forEach((then) => {
-                thenCall(self, then[0], then[1], then[2]);
-            });
-        }, 0);
+        nextTick(
+            function callback() {
+                thens.forEach((then) => {
+                    thenCall(self, then[0], then[1], then[2]);
+                });
+            }, 0);
     }
 };
 
@@ -89,7 +111,7 @@ function isFn(fnOrNot) {
 }
 
 function isPromise(obj) {
-    return MyPromise.prototype.isPrototypeOf(obj);
+    return obj && obj.__ispromise === true;
 }
 
 function thenable(obj) {
@@ -106,11 +128,10 @@ function thenable(obj) {
 
 function thenCall(promise, nextPromise, onFulfilled, onRejected) {
     // 根据 promise 的状态, 返回一个新的 promise
-    if (promise.error) {
+    if (promise.isRejected()) {
         if (isFn(onRejected)) {
             try {
                 const res = onRejected(promise.error);
-                // TODO: if res  thenable
                 doThen(nextPromise, res);
             } catch (e) {
                 nextPromise.reject(e);
@@ -141,7 +162,15 @@ function doThen(nextPromise, res) {
     if (res === nextPromise) {
         throw new TypeError("相同的 promise");
     } else if (isPromise(res)) {
-        res.then(nextPromise.fulfill, nextPromise.reject);
+        if (res.isPending()) {
+            res.then(nextPromise.fulfill, nextPromise.reject);
+        } else {
+            if(res.isRejected()) {
+                nextPromise.reject(res.error);
+            } else {
+                nextPromise.fulfill(res.value);
+            }
+        }
     } else if (thenable(res)) {
         const then = res.then;
         new MyPromise(then).then(

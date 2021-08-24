@@ -16,10 +16,11 @@ const adapter = {
         };
     }
 };
-
+// const resolved = new MyPromise().fulfill(true);
+// const rejected = new MyPromise().reject(false);
 const n = {
-    resolved: new MyPromise().fulfill(true),
-    rejected: new MyPromise().reject(false),
+    resolved: (v) => resolved,
+    rejected: () => rejected,
     deferred: () => {
         const promise = new MyPromise();
         return {
@@ -31,4 +32,4 @@ const n = {
 
 }
 
-module.exports = n;
+module.exports = adapter;
