@@ -1,7 +1,8 @@
 const nextTick = process.nextTick || setImmediate || setTimeout;
 
 let id = 0;
-module.exports = class MyPromise {
+let thens = [];
+class MyPromise {
     constructor(cb) {
         this.__ispromise = true;
         this.state = "pending"; // fulfilled, rejected
@@ -11,6 +12,7 @@ module.exports = class MyPromise {
         this.thens = [];
         this.children = [];
         this.id = id++;
+        thens.push(this);
 
         if (typeof cb !== "function") {
             return;
@@ -165,19 +167,23 @@ function doThen(nextPromise, res) {
         if (res.isPending()) {
             res.then(nextPromise.fulfill, nextPromise.reject);
         } else {
-            if(res.isRejected()) {
+            if (res.isRejected()) {
                 nextPromise.reject(res.error);
             } else {
                 nextPromise.fulfill(res.value);
             }
         }
-    } else if (thenable(res)) {
-        const then = res.then;
-        new MyPromise(then).then(
-            (v) => console.log(v) || nextPromise.fulfill(v),
-            nextPromise.reject
-        );
     } else {
+        if (res) {
+            const then = res.then;
+            if (isFn(then)) {
+                new MyPromise(then.bind(res)).then(
+                    (v) => nextPromise.fulfill(v),
+                    nextPromise.reject
+                );
+                return;
+            }
+        }
         nextPromise.fulfill(res);
     }
 }
@@ -219,3 +225,5 @@ console.log(" ----- then ----------- ");
 //     };
 //   })
 //   .then(thenOf("p3"), errorOf("p3"));
+
+module.exports = MyPromise;
