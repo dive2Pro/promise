@@ -81,13 +81,17 @@ class MyPromise {
     };
 
     resolved = (val) => {
-        const otherPromise = resolve({fulfill: this.resolved, reject: this.rejected}, val);
-        if (isPromise(otherPromise)) {
-            if (!this.isWaiting()) {
-            } else {
-                this.state = 'ing';
+        try {
+            const otherPromise = resolve({fulfill: this.resolved, reject: this.rejected}, val);
+            if (isPromise(otherPromise)) {
+                if (!this.isWaiting()) {
+                } else {
+                    this.state = 'ing';
+                }
+                return otherPromise;
             }
-            return otherPromise;
+        } catch (e) {
+            return this.reject(e);
         }
 
         this.state = "fulfilled";
@@ -97,15 +101,20 @@ class MyPromise {
     }
 
     rejected = (err) => {
-        const otherPromise = resolve({fulfill: this.resolved, reject: this.rejected}, err);
-        if (isPromise(otherPromise)) {
-            if (!this.isWaiting()) {
-            } else {
-                this.state = 'ing';
+        try {
+            const otherPromise = resolve({fulfill: this.resolved, reject: this.rejected}, err);
+            if (isPromise(otherPromise)) {
+                if (!this.isWaiting()) {
+                } else {
+                    this.state = 'ing';
+                }
+                return otherPromise;
             }
-            return otherPromise;
+        } catch (e) {
+            err = e;
         }
         this.error = err;
+        this.state = "rejected";
         this.next();
         return this;
     }
@@ -114,7 +123,6 @@ class MyPromise {
         if (!this.isPending()) {
             return;
         }
-        this.state = "rejected";
         return this.rejected(err);
     };
 
@@ -145,9 +153,6 @@ function isPromise(obj) {
     return obj && obj.__ispromise === true;
 }
 
-function thenable(obj) {
-    return obj && obj.then !== undefined && isFn(obj.then);
-}
 
 /**
  *
@@ -223,13 +228,17 @@ function doThen(nextPromise, res) {
         combineToPromise(nextPromise, res);
     } else {
         if (res) {
-            const then = res.then;
-            if (isFn(then)) {
-                combineToPromise(
-                    nextPromise,
-                    new MyPromise(then.bind(res))
-                );
-                return;
+            try {
+                const then = res.then;
+                if (isFn(then)) {
+                    combineToPromise(
+                        nextPromise,
+                        new MyPromise(then.bind(res))
+                    );
+                    return;
+                }
+            } catch (e) {
+                nextPromise.reject(e)
             }
         }
         nextPromise.fulfill(res);
