@@ -1,7 +1,6 @@
 const nextTick = process.nextTick || setImmediate || setTimeout;
 
 let id = 0;
-let thens = [];
 
 class MyPromise {
     constructor(cb) {
@@ -13,11 +12,9 @@ class MyPromise {
         this.thens = [];
         this.children = [];
         this.id = id++;
-        thens.push(this);
 
         if (typeof cb !== "function") {
             return;
-            // throw new Error(`arguments cb `);
         }
         try {
             this.cb(this.fulfill, this.reject);
@@ -26,37 +23,13 @@ class MyPromise {
         }
     }
 
-    thenWithPromise(promise) {
-        this.thens.push([promise])
-    }
-
     // then 的回调总是 nextTick 中执行
     then(promiseResolveFn, projectRejectFn) {
-        const self = this;
-        const otherPromise = new MyPromise((resolve, reject) => {
-        });
+        const otherPromise = new MyPromise();
         otherPromise.parent = this;
         this.thens.push([otherPromise, promiseResolveFn, projectRejectFn]);
         this.children.push(otherPromise);
-
-        if (!self.isWaiting()) {
-            this.next();
-            // if (self.value) {
-            //     otherPromise.fulfill(self.value);
-            //     if (typeof promiseResolveFn === 'function') {
-            //         // 这里也是返回一个 promise
-            //     }
-            //     // trigger(promiseResolveFn, this.value);
-            // }
-            // if (self.error) {
-            //     otherPromise.reject(self.error);
-            //     if (typeof projectRejectFn === 'function') {
-            //     }
-            //     // trigger(projectRejectFn, this.error);
-            // }
-        } else {
-        }
-        // TODO: 返回的是另外一个 Promise
+        this.next();
         return otherPromise;
     }
 
@@ -101,18 +74,6 @@ class MyPromise {
     }
 
     rejected = (err) => {
-        // try {
-        //     const otherPromise = resolve({fulfill: this.resolved, reject: this.rejected}, err);
-        //     if (isPromise(otherPromise)) {
-        //         if (!this.isWaiting()) {
-        //         } else {
-        //             this.state = 'ing';
-        //         }
-        //         return otherPromise;
-        //     }
-        // } catch (e) {
-        //     err = e;
-        // }
         this.error = err;
         this.state = "rejected";
         this.next();
@@ -199,7 +160,6 @@ function resolve(promise, x) {
     } else if (thenable(x)) {
         const then = x.then;
         if (isFn(then)) {
-            // 应该要异步执行？
             return combineToPromise(promise, new MyPromise(then.bind(x)))
         }
     }
@@ -213,7 +173,6 @@ function combineToPromise(promise, targetPromise) {
         if (targetPromise.isRejected()) {
             promise.reject(targetPromise.error);
         } else {
-            // TODO: 当 res.value = promise 的时候
             promise.fulfill(targetPromise.value);
         }
     }
@@ -248,43 +207,5 @@ function doThen(nextPromise, res) {
         nextPromise.fulfill(res);
     }
 }
-
-// const p = new MyPromise((res, rej) => {
-//   res(2);
-// }).then((v) => {
-//   // console.log("v", v);
-//   return 2;
-// });
-
-function thenOf(msg) {
-    return (v) => {
-        console.log(`then ${msg} - ${v}`);
-    };
-}
-
-function errorOf(msg) {
-    return (e) => {
-        console.log(`error ${msg} - ${e}`);
-    };
-}
-
-// const p2 = p.then(thenOf("-"), errorOf("@"));
-
-// p2.then(thenOf("p2"));
-
-console.log(" ----- then ----------- ");
-
-// const p3 = new MyPromise((res) => {
-//   res(2);
-// })
-//   .then(() => {
-//     return {
-//       then(resolve, reject) {
-//         console.log("resolve");
-//         resolve("5");
-//       }
-//     };
-//   })
-//   .then(thenOf("p3"), errorOf("p3"));
 
 module.exports = MyPromise;
