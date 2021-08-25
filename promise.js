@@ -2,6 +2,7 @@ const nextTick = process.nextTick || setImmediate || setTimeout;
 
 let id = 0;
 let thens = [];
+
 class MyPromise {
     constructor(cb) {
         this.__ispromise = true;
@@ -73,6 +74,11 @@ class MyPromise {
             return;
         }
 
+        const otherPromise = resolve(this, val);
+        if (isPromise(otherPromise)) {
+            return otherPromise;
+        }
+
         this.state = "fulfilled";
         this.value = val;
         this.next();
@@ -83,6 +89,12 @@ class MyPromise {
         if (!this.isPending()) {
             return;
         }
+
+        const otherPromise = resolve(this, err);
+        if (isPromise(otherPromise)) {
+            return otherPromise;
+        }
+
         this.state = "rejected";
         this.error = err;
         this.next();
@@ -155,6 +167,32 @@ function thenCall(promise, nextPromise, onFulfilled, onRejected) {
     }
 }
 
+function resolve(promise, x) {
+    if (isPromise(x)) {
+        return combineToPromise(promise, x);
+    } else if (x) {
+        const then = x.then;
+        if (isFn(then)) {
+            return combineToPromise(promise, new MyPromise(then.bind(x)))
+        }
+    }
+    return x;
+}
+
+function combineToPromise(promise, targetPromise) {
+    if (targetPromise.isPending()) {
+        targetPromise.then(promise.fulfill, promise.reject);
+    } else {
+        if (targetPromise.isRejected()) {
+            promise.reject(targetPromise.error);
+        } else {
+            // TODO: 当 res.value = promise 的时候
+            promise.fulfill(targetPromise.value);
+        }
+    }
+    return targetPromise;
+}
+
 /**
  *
  * @param {MyPromise} nextPromise
@@ -164,22 +202,14 @@ function doThen(nextPromise, res) {
     if (res === nextPromise) {
         throw new TypeError("相同的 promise");
     } else if (isPromise(res)) {
-        if (res.isPending()) {
-            res.then(nextPromise.fulfill, nextPromise.reject);
-        } else {
-            if (res.isRejected()) {
-                nextPromise.reject(res.error);
-            } else {
-                nextPromise.fulfill(res.value);
-            }
-        }
+        combineToPromise(nextPromise, res);
     } else {
         if (res) {
             const then = res.then;
             if (isFn(then)) {
-                new MyPromise(then.bind(res)).then(
-                    (v) => nextPromise.fulfill(v),
-                    nextPromise.reject
+                combineToPromise(
+                    nextPromise,
+                    new MyPromise(then.bind(res))
                 );
                 return;
             }
