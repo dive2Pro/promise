@@ -6,7 +6,7 @@ let thens = [];
 class MyPromise {
     constructor(cb) {
         this.__ispromise = true;
-        this.state = "pending"; // fulfilled, rejected
+        this.state = "pending"; // fulfilled, rejected,  ing
         this.value = null;
         this.error = null;
         this.cb = cb;
@@ -39,7 +39,7 @@ class MyPromise {
         this.thens.push([otherPromise, promiseResolveFn, projectRejectFn]);
         this.children.push(otherPromise);
 
-        if (!self.isPending()) {
+        if (!self.isWaiting()) {
             this.next();
             // if (self.value) {
             //     otherPromise.fulfill(self.value);
@@ -64,8 +64,11 @@ class MyPromise {
         return this.state === "pending";
     }
 
-    isRejected() {
+    isWaiting() {
+        return this.state === 'ing' || this.isPending();
+    }
 
+    isRejected() {
         return this.state === "rejected";
     }
 
@@ -73,36 +76,50 @@ class MyPromise {
         if (!this.isPending()) {
             return;
         }
+        return this.resolved(val);
 
-        const otherPromise = resolve(this, val);
+    };
+
+    resolved = (val) => {
+        const otherPromise = resolve({fulfill: this.resolved, reject: this.rejected}, val);
         if (isPromise(otherPromise)) {
+            if (!this.isWaiting()) {
+            } else {
+                this.state = 'ing';
+            }
             return otherPromise;
         }
 
         this.state = "fulfilled";
         this.value = val;
         this.next();
+        return this
+    }
+
+    rejected = (err) => {
+        const otherPromise = resolve({fulfill: this.resolved, reject: this.rejected}, err);
+        if (isPromise(otherPromise)) {
+            if (!this.isWaiting()) {
+            } else {
+                this.state = 'ing';
+            }
+            return otherPromise;
+        }
+        this.error = err;
+        this.next();
         return this;
-    };
+    }
 
     reject = (err) => {
         if (!this.isPending()) {
             return;
         }
-
-        const otherPromise = resolve(this, err);
-        if (isPromise(otherPromise)) {
-            return otherPromise;
-        }
-
         this.state = "rejected";
-        this.error = err;
-        this.next();
-        return this;
+        return this.rejected(err);
     };
 
     next() {
-        if (this.state === "pending") {
+        if (this.isWaiting()) {
             return;
         }
         // console.log("🎇 next", this, this.state, this.value, this.thens);
@@ -173,6 +190,7 @@ function resolve(promise, x) {
     } else if (x) {
         const then = x.then;
         if (isFn(then)) {
+            // 应该要异步执行？
             return combineToPromise(promise, new MyPromise(then.bind(x)))
         }
     }
@@ -180,7 +198,7 @@ function resolve(promise, x) {
 }
 
 function combineToPromise(promise, targetPromise) {
-    if (targetPromise.isPending()) {
+    if (targetPromise.isWaiting()) {
         targetPromise.then(promise.fulfill, promise.reject);
     } else {
         if (targetPromise.isRejected()) {
