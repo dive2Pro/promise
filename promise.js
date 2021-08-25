@@ -101,18 +101,18 @@ class MyPromise {
     }
 
     rejected = (err) => {
-        try {
-            const otherPromise = resolve({fulfill: this.resolved, reject: this.rejected}, err);
-            if (isPromise(otherPromise)) {
-                if (!this.isWaiting()) {
-                } else {
-                    this.state = 'ing';
-                }
-                return otherPromise;
-            }
-        } catch (e) {
-            err = e;
-        }
+        // try {
+        //     const otherPromise = resolve({fulfill: this.resolved, reject: this.rejected}, err);
+        //     if (isPromise(otherPromise)) {
+        //         if (!this.isWaiting()) {
+        //         } else {
+        //             this.state = 'ing';
+        //         }
+        //         return otherPromise;
+        //     }
+        // } catch (e) {
+        //     err = e;
+        // }
         this.error = err;
         this.state = "rejected";
         this.next();
