@@ -189,10 +189,14 @@ function thenCall(promise, nextPromise, onFulfilled, onRejected) {
     }
 }
 
+function thenable(obj) {
+    return obj && (typeof obj === 'function' || typeof obj === 'object');
+}
+
 function resolve(promise, x) {
     if (isPromise(x)) {
         return combineToPromise(promise, x);
-    } else if (x) {
+    } else if (thenable(x)) {
         const then = x.then;
         if (isFn(then)) {
             // 应该要异步执行？
@@ -227,7 +231,7 @@ function doThen(nextPromise, res) {
     } else if (isPromise(res)) {
         combineToPromise(nextPromise, res);
     } else {
-        if (res) {
+        if (thenable(res)) {
             try {
                 const then = res.then;
                 if (isFn(then)) {
