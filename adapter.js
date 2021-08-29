@@ -1,4 +1,5 @@
 const MyPromise = require("./promise");
+const MyPromise2 = require('./promise-2');
 
 const adapter = {
     resolved: (value) => {
@@ -32,4 +33,18 @@ const n = {
 
 }
 
-module.exports = adapter;
+const adapter2 = {
+    resolved: v => MyPromise2.resolve(v),
+    rejected: MyPromise2.reject,
+    deferred: () => {
+        const resolver = () => {}
+        const promise = new MyPromise2(resolver);
+        return {
+            promise,
+            resolve: promise.resolve,
+            reject: promise.reject
+        }
+    }
+}
+
+module.exports = adapter2;
